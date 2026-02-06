@@ -2,12 +2,19 @@ const express = require('express');
 const router = express.Router();
 const authController = require('../controllers/authController');
 const { signupLimiter, generalLimiter } = require('../middleware/rateLimiter');
+const { authenticate } = require('../middleware/auth');
 
 /**
  * POST /api/auth/signup
  * Register a new user
  */
 router.post('/signup', signupLimiter, authController.signup);
+
+/**
+ * POST /api/auth/login
+ * Login with email and password
+ */
+router.post('/login', generalLimiter, authController.login);
 
 /**
  * GET /api/auth/verify-email
@@ -26,5 +33,11 @@ router.post('/check-email', generalLimiter, authController.checkEmail);
  * Check if nickname is available
  */
 router.post('/check-nickname', generalLimiter, authController.checkNickname);
+
+/**
+ * GET /api/auth/me
+ * Get current user info (requires authentication)
+ */
+router.get('/me', authenticate, authController.getCurrentUser);
 
 module.exports = router;

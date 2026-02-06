@@ -1,8 +1,8 @@
-# Email-Based User Registration API Documentation
+# API Documentation - 모두의 책
 
 ## Overview
 
-This API provides email-based user registration with verification functionality for the "모두의 책" project.
+This API provides user authentication, post management, and comment features for the "모두의 책" project.
 
 ## Base URL
 
@@ -10,7 +10,17 @@ This API provides email-based user registration with verification functionality 
 http://localhost:3000/api
 ```
 
-## API Endpoints
+## Table of Contents
+
+1. [Authentication Endpoints](#authentication-endpoints)
+2. [Comment & Reply Endpoints](#comment--reply-endpoints)
+3. [Security & Rate Limiting](#security--rate-limiting)
+4. [Database Schema](#database-schema)
+5. [Testing](#testing)
+
+---
+
+## Authentication Endpoints
 
 ### 1. User Registration
 
@@ -53,36 +63,9 @@ http://localhost:3000/api
 ```
 
 **Error Responses:**
-
-*400 Bad Request - Invalid input:*
-```json
-{
-  "success": false,
-  "message": "비밀번호는 최소 8자 이상이어야 합니다.",
-  "errors": {
-    "password": ["비밀번호는 최소 8자 이상이어야 합니다."]
-  }
-}
-```
-
-*409 Conflict - Email or nickname already exists:*
-```json
-{
-  "success": false,
-  "message": "이미 사용 중인 이메일입니다.",
-  "errors": {
-    "email": "이미 사용 중인 이메일입니다."
-  }
-}
-```
-
-*429 Too Many Requests - Rate limit exceeded:*
-```json
-{
-  "success": false,
-  "message": "너무 많은 가입 시도가 감지되었습니다. 15분 후에 다시 시도해주세요."
-}
-```
+- `400 Bad Request` - Invalid input
+- `409 Conflict` - Email or nickname already exists
+- `429 Too Many Requests` - Rate limit exceeded
 
 ---
 
@@ -114,37 +97,13 @@ GET /api/auth/verify-email?token=a1b2c3d4e5f6...
 }
 ```
 
-**Error Responses:**
-
-*400 Bad Request - Invalid/expired token:*
-```json
-{
-  "success": false,
-  "message": "유효하지 않은 인증 토큰입니다."
-}
-```
-
-```json
-{
-  "success": false,
-  "message": "만료된 인증 토큰입니다. 다시 시도해주세요."
-}
-```
-
-```json
-{
-  "success": false,
-  "message": "이미 사용된 인증 토큰입니다."
-}
-```
-
 ---
 
 ### 3. Check Email Availability
 
 **Endpoint:** `POST /api/auth/check-email`
 
-**Description:** Check if an email is available for registration. Used for real-time frontend validation.
+**Description:** Check if an email is available for registration.
 
 **Request Body:**
 ```json
@@ -162,23 +121,13 @@ GET /api/auth/verify-email?token=a1b2c3d4e5f6...
 }
 ```
 
-```json
-{
-  "success": true,
-  "available": false,
-  "message": "이미 사용 중인 이메일입니다."
-}
-```
-
-**Rate Limit:** 30 requests per minute per IP
-
 ---
 
 ### 4. Check Nickname Availability
 
 **Endpoint:** `POST /api/auth/check-nickname`
 
-**Description:** Check if a nickname is available for registration. Used for real-time frontend validation.
+**Description:** Check if a nickname is available for registration.
 
 **Request Body:**
 ```json
@@ -196,31 +145,151 @@ GET /api/auth/verify-email?token=a1b2c3d4e5f6...
 }
 ```
 
+---
+
+## Comment & Reply Endpoints
+
+> **📝 Note:** For detailed comment API documentation, see [COMMENTS_API.md](./COMMENTS_API.md)
+
+### 1. Create Comment or Reply
+
+**Endpoint:** `POST /api/posts/:postId/comments`
+
+**Authentication:** Required (Bearer token)
+
+**Description:** Create a new comment on a post or reply to an existing comment.
+
+**Request Body:**
 ```json
 {
-  "success": true,
-  "available": false,
-  "message": "이미 사용 중인 닉네임입니다."
+  "content": "This is my comment",
+  "parentCommentId": 123  // Optional: for replies
 }
 ```
 
-**Rate Limit:** 30 requests per minute per IP
+**Success Response (201):**
+```json
+{
+  "success": true,
+  "message": "댓글이 작성되었습니다.",
+  "data": {
+    "id": 456,
+    "post_id": 1,
+    "user_id": 10,
+    "parent_comment_id": 123,
+    "content": "This is my comment",
+    "created_at": "2026-02-03T12:34:56.789Z",
+    "nickname": "john_doe",
+    "profile_picture": "https://example.com/profile.jpg"
+  }
+}
+```
 
 ---
 
-## Rate Limiting
+### 2. Get Comments for a Post
 
+**Endpoint:** `GET /api/posts/:postId/comments`
+
+**Authentication:** Not required
+
+**Description:** Retrieve all comments for a post with nested replies.
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "comments": [
+      {
+        "id": 1,
+        "content": "Great post!",
+        "nickname": "john_doe",
+        "profile_picture": "https://example.com/john.jpg",
+        "created_at": "2026-02-03T10:00:00.000Z",
+        "replies": [
+          {
+            "id": 2,
+            "content": "@john_doe Thanks!",
+            "nickname": "jane_doe",
+            "created_at": "2026-02-03T10:05:00.000Z"
+          }
+        ]
+      }
+    ],
+    "total": 2
+  }
+}
+```
+
+---
+
+### 3. Update Comment
+
+**Endpoint:** `PATCH /api/comments/:commentId`
+
+**Authentication:** Required (Bearer token)
+
+**Description:** Update comment content. Users can only update their own comments.
+
+**Request Body:**
+```json
+{
+  "content": "Updated comment content"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "댓글이 수정되었습니다.",
+  "data": { /* updated comment */ }
+}
+```
+
+---
+
+### 4. Delete Comment
+
+**Endpoint:** `DELETE /api/comments/:commentId`
+
+**Authentication:** Required (Bearer token)
+
+**Description:** Delete a comment. Users can only delete their own comments.
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "댓글이 삭제되었습니다."
+}
+```
+
+---
+
+## Security & Rate Limiting
+
+### Rate Limits
 - **Signup endpoint:** 5 requests per 15 minutes per IP
 - **Check endpoints:** 30 requests per minute per IP
 
-## Security Features
-
-1. **Password Hashing:** Passwords are hashed using bcrypt with 10 salt rounds
-2. **CORS Protection:** Configured to accept requests from specified frontend URL
-3. **Helmet Security:** HTTP headers secured with Helmet middleware
-4. **Rate Limiting:** Prevents abuse with request limits
-5. **Token Security:** Verification tokens are cryptographically secure (64 hex characters)
+### Security Features
+1. **Password Hashing:** bcrypt with 10 salt rounds
+2. **JWT Authentication:** Token-based authentication for protected endpoints
+3. **CORS Protection:** Configured for specified frontend URL
+4. **Helmet Security:** HTTP headers secured
+5. **Token Security:** Cryptographically secure verification tokens
 6. **Token Expiration:** Verification tokens expire after 24 hours
+
+### Authentication
+
+Protected endpoints require JWT token in Authorization header:
+```
+Authorization: Bearer <your-jwt-token>
+```
+
+---
 
 ## Database Schema
 
@@ -231,9 +300,36 @@ CREATE TABLE users (
   email VARCHAR(255) UNIQUE NOT NULL,
   password VARCHAR(255) NOT NULL,
   nickname VARCHAR(50) UNIQUE NOT NULL,
+  profile_picture VARCHAR(255),
   status VARCHAR(20) DEFAULT 'inactive',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Posts Table
+```sql
+CREATE TABLE posts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Comments Table
+```sql
+CREATE TABLE comments (
+  id SERIAL PRIMARY KEY,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  parent_comment_id INTEGER REFERENCES comments(id) ON DELETE CASCADE,
+  content VARCHAR(500) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT content_length CHECK (char_length(content) <= 500)
 );
 ```
 
@@ -249,7 +345,67 @@ CREATE TABLE email_verification_tokens (
 );
 ```
 
-## Error Handling
+---
+
+## Testing
+
+### Using cURL
+
+**Register a user:**
+```bash
+curl -X POST http://localhost:3000/api/auth/signup \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@example.com","password":"TestPass123!","nickname":"testuser"}'
+```
+
+**Create a comment:**
+```bash
+curl -X POST http://localhost:3000/api/posts/1/comments \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-token>" \
+  -d '{"content":"Great post!"}'
+```
+
+**Get comments:**
+```bash
+curl http://localhost:3000/api/posts/1/comments
+```
+
+**Update a comment:**
+```bash
+curl -X PATCH http://localhost:3000/api/comments/1 \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer <your-token>" \
+  -d '{"content":"Updated content"}'
+```
+
+**Delete a comment:**
+```bash
+curl -X DELETE http://localhost:3000/api/comments/1 \
+  -H "Authorization: Bearer <your-token>"
+```
+
+---
+
+## Environment Variables
+
+See `.env.example` for required environment variables:
+
+- `PORT`: Server port (default: 3000)
+- `NODE_ENV`: Environment (development/production)
+- `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: Secret key for JWT token generation
+- `EMAIL_HOST`: SMTP server host
+- `EMAIL_PORT`: SMTP server port
+- `EMAIL_USER`: SMTP username
+- `EMAIL_PASSWORD`: SMTP password
+- `EMAIL_FROM`: Sender email address
+- `FRONTEND_URL`: Frontend application URL
+- `VERIFICATION_TOKEN_EXPIRY_HOURS`: Token validity period (default: 24)
+
+---
+
+## Error Response Format
 
 All API responses follow a consistent format:
 
@@ -271,61 +427,15 @@ All API responses follow a consistent format:
 }
 ```
 
-## Testing the API
-
-### Using cURL
-
-**1. Register a new user:**
-```bash
-curl -X POST http://localhost:3000/api/auth/signup \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "test@example.com",
-    "password": "TestPass123!",
-    "nickname": "testuser"
-  }'
-```
-
-**2. Check email availability:**
-```bash
-curl -X POST http://localhost:3000/api/auth/check-email \
-  -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com"}'
-```
-
-**3. Check nickname availability:**
-```bash
-curl -X POST http://localhost:3000/api/auth/check-nickname \
-  -H "Content-Type: application/json" \
-  -d '{"nickname": "testuser"}'
-```
-
-**4. Verify email:**
-```bash
-curl http://localhost:3000/api/auth/verify-email?token=YOUR_TOKEN_HERE
-```
-
-## Environment Variables
-
-See `.env.example` for required environment variables:
-
-- `PORT`: Server port (default: 3000)
-- `NODE_ENV`: Environment (development/production)
-- `DATABASE_URL`: PostgreSQL connection string
-- `EMAIL_HOST`: SMTP server host
-- `EMAIL_PORT`: SMTP server port
-- `EMAIL_USER`: SMTP username
-- `EMAIL_PASSWORD`: SMTP password
-- `EMAIL_FROM`: Sender email address
-- `FRONTEND_URL`: Frontend application URL
-- `VERIFICATION_TOKEN_EXPIRY_HOURS`: Token validity period (default: 24)
+---
 
 ## Deployment Notes
 
 1. Ensure PostgreSQL database is set up
 2. Run database migrations: `npm run migrate`
-3. Configure environment variables
-4. Set up SMTP email service (Gmail, SendGrid, etc.)
-5. Update CORS settings for production frontend URL
+3. Configure all environment variables
+4. Set up SMTP email service
+5. Update CORS settings for production
 6. Use HTTPS in production
 7. Monitor rate limits and adjust as needed
+8. Keep JWT_SECRET secure and rotate periodically

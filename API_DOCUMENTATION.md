@@ -1,8 +1,8 @@
-# Email-Based User Registration API Documentation
+# Email-Based User Registration and Post Like API Documentation
 
 ## Overview
 
-This API provides email-based user registration with verification functionality for the "모두의 책" project.
+This API provides email-based user registration with verification functionality, post management, and like features for the "모두의 책" project.
 
 ## Base URL
 
@@ -10,7 +10,17 @@ This API provides email-based user registration with verification functionality 
 http://localhost:3000/api
 ```
 
-## API Endpoints
+## Authentication
+
+Most endpoints require JWT authentication. Include the token in the Authorization header:
+
+```
+Authorization: Bearer <your-jwt-token>
+```
+
+---
+
+## Authentication Endpoints
 
 ### 1. User Registration
 
@@ -52,53 +62,74 @@ http://localhost:3000/api
 }
 ```
 
+---
+
+### 2. User Login
+
+**Endpoint:** `POST /api/auth/login`
+
+**Description:** Login with email and password. Returns JWT token.
+
+**Request Body:**
+```json
+{
+  "email": "user@example.com",
+  "password": "SecurePass123!"
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "로그인에 성공했습니다.",
+  "data": {
+    "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+    "user": {
+      "id": 1,
+      "email": "user@example.com",
+      "nickname": "user123",
+      "status": "active"
+    }
+  }
+}
+```
+
 **Error Responses:**
+- **401:** Email or password incorrect
+- **403:** Email not verified
 
-*400 Bad Request - Invalid input:*
+---
+
+### 3. Get Current User
+
+**Endpoint:** `GET /api/auth/me`
+
+**Description:** Get current authenticated user information.
+
+**Authentication:** Required
+
+**Success Response (200):**
 ```json
 {
-  "success": false,
-  "message": "비밀번호는 최소 8자 이상이어야 합니다.",
-  "errors": {
-    "password": ["비밀번호는 최소 8자 이상이어야 합니다."]
+  "success": true,
+  "data": {
+    "id": 1,
+    "email": "user@example.com",
+    "nickname": "user123",
+    "status": "active"
   }
-}
-```
-
-*409 Conflict - Email or nickname already exists:*
-```json
-{
-  "success": false,
-  "message": "이미 사용 중인 이메일입니다.",
-  "errors": {
-    "email": "이미 사용 중인 이메일입니다."
-  }
-}
-```
-
-*429 Too Many Requests - Rate limit exceeded:*
-```json
-{
-  "success": false,
-  "message": "너무 많은 가입 시도가 감지되었습니다. 15분 후에 다시 시도해주세요."
 }
 ```
 
 ---
 
-### 2. Email Verification
+### 4. Email Verification
 
 **Endpoint:** `GET /api/auth/verify-email`
 
-**Description:** Verify user email and activate account using verification token.
-
 **Query Parameters:**
 - `token` (required): Verification token sent via email
-
-**Example:**
-```
-GET /api/auth/verify-email?token=a1b2c3d4e5f6...
-```
 
 **Success Response (200):**
 ```json
@@ -114,37 +145,11 @@ GET /api/auth/verify-email?token=a1b2c3d4e5f6...
 }
 ```
 
-**Error Responses:**
-
-*400 Bad Request - Invalid/expired token:*
-```json
-{
-  "success": false,
-  "message": "유효하지 않은 인증 토큰입니다."
-}
-```
-
-```json
-{
-  "success": false,
-  "message": "만료된 인증 토큰입니다. 다시 시도해주세요."
-}
-```
-
-```json
-{
-  "success": false,
-  "message": "이미 사용된 인증 토큰입니다."
-}
-```
-
 ---
 
-### 3. Check Email Availability
+### 5. Check Email Availability
 
 **Endpoint:** `POST /api/auth/check-email`
-
-**Description:** Check if an email is available for registration. Used for real-time frontend validation.
 
 **Request Body:**
 ```json
@@ -162,23 +167,11 @@ GET /api/auth/verify-email?token=a1b2c3d4e5f6...
 }
 ```
 
-```json
-{
-  "success": true,
-  "available": false,
-  "message": "이미 사용 중인 이메일입니다."
-}
-```
-
-**Rate Limit:** 30 requests per minute per IP
-
 ---
 
-### 4. Check Nickname Availability
+### 6. Check Nickname Availability
 
 **Endpoint:** `POST /api/auth/check-nickname`
-
-**Description:** Check if a nickname is available for registration. Used for real-time frontend validation.
 
 **Request Body:**
 ```json
@@ -196,15 +189,223 @@ GET /api/auth/verify-email?token=a1b2c3d4e5f6...
 }
 ```
 
+---
+
+## Post Endpoints
+
+### 1. Get All Posts
+
+**Endpoint:** `GET /api/posts`
+
+**Description:** Get all posts with pagination. Includes like count and user's like status.
+
+**Authentication:** Optional (for `isLiked` field)
+
+**Query Parameters:**
+- `limit` (optional): Number of posts per page (default: 20)
+- `offset` (optional): Number of posts to skip (default: 0)
+
+**Success Response (200):**
 ```json
 {
   "success": true,
-  "available": false,
-  "message": "이미 사용 중인 닉네임입니다."
+  "data": [
+    {
+      "id": 1,
+      "user_id": 1,
+      "title": "My First Post",
+      "content": "This is the content of my first post.",
+      "author_nickname": "user123",
+      "like_count": 15,
+      "is_liked": true,
+      "created_at": "2024-01-15T10:30:00.000Z",
+      "updated_at": "2024-01-15T10:30:00.000Z"
+    }
+  ],
+  "pagination": {
+    "limit": 20,
+    "offset": 0,
+    "count": 1
+  }
 }
 ```
 
-**Rate Limit:** 30 requests per minute per IP
+---
+
+### 2. Get Single Post
+
+**Endpoint:** `GET /api/posts/:postId`
+
+**Description:** Get a single post by ID with like information.
+
+**Authentication:** Optional (for `isLiked` field)
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "title": "My First Post",
+    "content": "This is the content of my first post.",
+    "author_nickname": "user123",
+    "like_count": 15,
+    "is_liked": true,
+    "created_at": "2024-01-15T10:30:00.000Z",
+    "updated_at": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "success": false,
+  "message": "게시물을 찾을 수 없습니다."
+}
+```
+
+---
+
+### 3. Create Post
+
+**Endpoint:** `POST /api/posts`
+
+**Description:** Create a new post.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "title": "My New Post",
+  "content": "This is the content of my new post."
+}
+```
+
+**Success Response (201):**
+```json
+{
+  "success": true,
+  "message": "게시물이 생성되었습니다.",
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "title": "My New Post",
+    "content": "This is the content of my new post.",
+    "like_count": 0,
+    "is_liked": false,
+    "created_at": "2024-01-15T10:30:00.000Z",
+    "updated_at": "2024-01-15T10:30:00.000Z"
+  }
+}
+```
+
+---
+
+### 4. Update Post
+
+**Endpoint:** `PUT /api/posts/:postId`
+
+**Description:** Update an existing post. Only the author can update.
+
+**Authentication:** Required
+
+**Request Body:**
+```json
+{
+  "title": "Updated Title",
+  "content": "Updated content."
+}
+```
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "게시물이 수정되었습니다.",
+  "data": {
+    "id": 1,
+    "user_id": 1,
+    "title": "Updated Title",
+    "content": "Updated content.",
+    "created_at": "2024-01-15T10:30:00.000Z",
+    "updated_at": "2024-01-15T11:00:00.000Z"
+  }
+}
+```
+
+**Error Response (403):**
+```json
+{
+  "success": false,
+  "message": "게시물을 수정할 권한이 없습니다."
+}
+```
+
+---
+
+### 5. Delete Post
+
+**Endpoint:** `DELETE /api/posts/:postId`
+
+**Description:** Delete a post. Only the author can delete.
+
+**Authentication:** Required
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "게시물이 삭제되었습니다."
+}
+```
+
+---
+
+### 6. Toggle Like
+
+**Endpoint:** `POST /api/posts/:postId/toggle-like`
+
+**Description:** Toggle like status for a post. Creates a like if not liked, removes if already liked.
+
+**Authentication:** Required
+
+**Success Response (200):**
+```json
+{
+  "success": true,
+  "message": "좋아요를 눌렀습니다.",
+  "data": {
+    "action": "liked",
+    "likeCount": 16,
+    "isLiked": true
+  }
+}
+```
+
+Or when unliking:
+
+```json
+{
+  "success": true,
+  "message": "좋아요를 취소했습니다.",
+  "data": {
+    "action": "unliked",
+    "likeCount": 15,
+    "isLiked": false
+  }
+}
+```
+
+**Error Response (404):**
+```json
+{
+  "success": false,
+  "message": "게시물을 찾을 수 없습니다."
+}
+```
 
 ---
 
@@ -212,15 +413,21 @@ GET /api/auth/verify-email?token=a1b2c3d4e5f6...
 
 - **Signup endpoint:** 5 requests per 15 minutes per IP
 - **Check endpoints:** 30 requests per minute per IP
+- **Post endpoints:** 100 requests per minute per IP
+
+---
 
 ## Security Features
 
 1. **Password Hashing:** Passwords are hashed using bcrypt with 10 salt rounds
-2. **CORS Protection:** Configured to accept requests from specified frontend URL
-3. **Helmet Security:** HTTP headers secured with Helmet middleware
-4. **Rate Limiting:** Prevents abuse with request limits
-5. **Token Security:** Verification tokens are cryptographically secure (64 hex characters)
-6. **Token Expiration:** Verification tokens expire after 24 hours
+2. **JWT Authentication:** Secure token-based authentication with 7-day expiry
+3. **CORS Protection:** Configured to accept requests from specified frontend URL
+4. **Helmet Security:** HTTP headers secured with Helmet middleware
+5. **Rate Limiting:** Prevents abuse with request limits
+6. **Token Security:** Verification tokens are cryptographically secure (64 hex characters)
+7. **Token Expiration:** Verification tokens expire after 24 hours
+
+---
 
 ## Database Schema
 
@@ -237,6 +444,29 @@ CREATE TABLE users (
 );
 ```
 
+### Posts Table
+```sql
+CREATE TABLE posts (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  title VARCHAR(255) NOT NULL,
+  content TEXT NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+```
+
+### Likes Table
+```sql
+CREATE TABLE likes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  post_id INTEGER NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(user_id, post_id)
+);
+```
+
 ### Email Verification Tokens Table
 ```sql
 CREATE TABLE email_verification_tokens (
@@ -249,27 +479,7 @@ CREATE TABLE email_verification_tokens (
 );
 ```
 
-## Error Handling
-
-All API responses follow a consistent format:
-
-**Success:**
-```json
-{
-  "success": true,
-  "message": "Success message",
-  "data": { ... }
-}
-```
-
-**Error:**
-```json
-{
-  "success": false,
-  "message": "Error message",
-  "errors": { ... }
-}
-```
+---
 
 ## Testing the API
 
@@ -286,24 +496,45 @@ curl -X POST http://localhost:3000/api/auth/signup \
   }'
 ```
 
-**2. Check email availability:**
+**2. Login:**
 ```bash
-curl -X POST http://localhost:3000/api/auth/check-email \
+curl -X POST http://localhost:3000/api/auth/login \
   -H "Content-Type: application/json" \
-  -d '{"email": "test@example.com"}'
+  -d '{
+    "email": "test@example.com",
+    "password": "TestPass123!"
+  }'
 ```
 
-**3. Check nickname availability:**
+**3. Get all posts:**
 ```bash
-curl -X POST http://localhost:3000/api/auth/check-nickname \
-  -H "Content-Type: application/json" \
-  -d '{"nickname": "testuser"}'
+curl http://localhost:3000/api/posts
 ```
 
-**4. Verify email:**
+**4. Get all posts (authenticated):**
 ```bash
-curl http://localhost:3000/api/auth/verify-email?token=YOUR_TOKEN_HERE
+curl http://localhost:3000/api/posts \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
 ```
+
+**5. Create a post:**
+```bash
+curl -X POST http://localhost:3000/api/posts \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN" \
+  -d '{
+    "title": "My First Post",
+    "content": "This is my first post content."
+  }'
+```
+
+**6. Toggle like:**
+```bash
+curl -X POST http://localhost:3000/api/posts/1/toggle-like \
+  -H "Authorization: Bearer YOUR_JWT_TOKEN"
+```
+
+---
 
 ## Environment Variables
 
@@ -312,6 +543,7 @@ See `.env.example` for required environment variables:
 - `PORT`: Server port (default: 3000)
 - `NODE_ENV`: Environment (development/production)
 - `DATABASE_URL`: PostgreSQL connection string
+- `JWT_SECRET`: Secret key for JWT signing
 - `EMAIL_HOST`: SMTP server host
 - `EMAIL_PORT`: SMTP server port
 - `EMAIL_USER`: SMTP username
@@ -320,11 +552,13 @@ See `.env.example` for required environment variables:
 - `FRONTEND_URL`: Frontend application URL
 - `VERIFICATION_TOKEN_EXPIRY_HOURS`: Token validity period (default: 24)
 
+---
+
 ## Deployment Notes
 
 1. Ensure PostgreSQL database is set up
 2. Run database migrations: `npm run migrate`
-3. Configure environment variables
+3. Configure environment variables (especially JWT_SECRET)
 4. Set up SMTP email service (Gmail, SendGrid, etc.)
 5. Update CORS settings for production frontend URL
 6. Use HTTPS in production

@@ -1,7 +1,21 @@
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const VerificationToken = require('../models/VerificationToken');
 const { isValidEmail, validatePassword, validateNickname } = require('../utils/validation');
 const { sendVerificationEmail } = require('../utils/emailService');
+
+/**
+ * Generate JWT token
+ * @param {number} userId - User ID
+ * @returns {string} - JWT token
+ */
+const generateToken = (userId) => {
+  return jwt.sign(
+    { userId },
+    process.env.JWT_SECRET,
+    { expiresIn: '7d' }
+  );
+};
 
 /**
  * POST /api/auth/signup
@@ -99,6 +113,74 @@ const signup = async (req, res) => {
     return res.status(500).json({
       success: false,
       message: '회원가입 중 오류가 발생했습니다. 다시 시도해주세요.',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * POST /api/auth/login
+ * Login with email and password
+ */
+const login = async (req, res) => {
+  try {
+    const { email, password } = req.body;
+
+    // Validate input
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: '이메일과 비밀번호를 입력해주세요.'
+      });
+    }
+
+    // Find user
+    const user = await User.findByEmail(email);
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: '이메일 또는 비밀번호가 올바르지 않습니다.'
+      });
+    }
+
+    // Check if user is active
+    if (user.status !== 'active') {
+      return res.status(403).json({
+        success: false,
+        message: '이메일 인증이 필요합니다.'
+      });
+    }
+
+    // Verify password
+    const isPasswordValid = await User.comparePassword(password, user.password);
+    if (!isPasswordValid) {
+      return res.status(401).json({
+        success: false,
+        message: '이메일 또는 비밀번호가 올바르지 않습니다.'
+      });
+    }
+
+    // Generate JWT token
+    const token = generateToken(user.id);
+
+    return res.status(200).json({
+      success: true,
+      message: '로그인에 성공했습니다.',
+      data: {
+        token,
+        user: {
+          id: user.id,
+          email: user.email,
+          nickname: user.nickname,
+          status: user.status
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    return res.status(500).json({
+      success: false,
+      message: '로그인 중 오류가 발생했습니다.',
       error: process.env.NODE_ENV === 'development' ? error.message : undefined
     });
   }
@@ -243,9 +325,30 @@ const checkNickname = async (req, res) => {
   }
 };
 
+/**
+ * GET /api/auth/me
+ * Get current user info
+ */
+const getCurrentUser = async (req, res) => {
+  try {
+    return res.status(200).json({
+      success: true,
+      data: req.user
+    });
+  } catch (error) {
+    console.error('Get current user error:', error);
+    return res.status(500).json({
+      success: false,
+      message: '사용자 정보 조회 중 오류가 발생했습니다.'
+    });
+  }
+};
+
 module.exports = {
   signup,
+  login,
   verifyEmail,
   checkEmail,
-  checkNickname
+  checkNickname,
+  getCurrentUser
 };
